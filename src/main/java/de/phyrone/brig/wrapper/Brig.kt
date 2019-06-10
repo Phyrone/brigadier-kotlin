@@ -52,6 +52,7 @@ abstract class AbstractCommandNodeImpl<T>(private val arg: ArgumentBuilder<T, *>
         val node = ChildCommandNodeImpl(arg, this)
         childSet.add(node)
         setup.invoke(node)
+        this.arg.then(arg)
     }
 
     override fun command(name: String, setup: CommandNode<T>.() -> Unit) {
@@ -94,4 +95,5 @@ fun <T> CommandDispatcher<T>.command(name: String, setup: CommandNode<T>.() -> U
     val node = RootCommandNodeImpl<T>(literal, this)
     setup.invoke(node)
     node.postReqister()
+    this.register(literal)
 }
