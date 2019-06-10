@@ -95,12 +95,3 @@ fun <T> CommandDispatcher<T>.command(name: String, setup: CommandNode<T>.() -> U
     setup.invoke(node)
     node.postReqister()
 }
-
-fun main(args: Array<String>) {
-    val dispatcher = CommandDispatcher<String>()
-    dispatcher.command("rl") {
-        executes {
-            0
-        }
-    }
-}
