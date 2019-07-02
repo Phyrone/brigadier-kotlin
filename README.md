@@ -12,3 +12,46 @@ dispatcher.liternal("printString") {
    }
 }
 ```
+## Example
+```kotlin
+    //Command is a Test Interface (just ignore it)
+    val dispatcher = CommandDispatcher<Command>()
+    dispatcher.literal("stop") {
+        executes {
+            //exit
+            exitProcess(0)
+        }
+    }
+    dispatcher.literal("help") {
+        runs {
+            //"runs" Always return 0
+            sender.sendMessage("All Commands:")
+            dispatcher.getAllUsage(dispatcher.root, this, false).forEach {
+                sender.sendMessage("> $it")
+            }
+        }
+        argument("startswith", StringArgument) {
+            runs {
+                sender.sendMessage("All Commands:")
+                //get the argument
+                val startsWthInput = it.getArgument<String>("startswith")
+                dispatcher.getAllUsage(dispatcher.root, this, false).forEach { line ->
+                    if (line.startsWith(startsWthInput, true))
+                        sender.sendMessage("> $line")
+                }
+            }
+        }
+    }
+    dispatcher.literal("foo") {
+        literal("bar") {
+            literal("moreDeepFoo") {
+                literal("howMuchMore") {
+                    executes {
+                        sender.sendMessage("to infinity")
+                        return@executes 0
+                    }
+                }
+            }
+        }
+    }
+```
