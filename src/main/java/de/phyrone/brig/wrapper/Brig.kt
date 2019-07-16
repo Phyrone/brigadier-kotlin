@@ -8,8 +8,11 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.builder.RequiredArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.suggestion.SuggestionProvider
+import com.mojang.brigadier.suggestion.Suggestions
+import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import com.mojang.brigadier.tree.CommandNode
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CompletableFuture
 import java.util.function.Predicate
 import kotlin.reflect.KClass
 
@@ -57,30 +60,39 @@ interface DSLCommandNode<T> {
     /**
      * @see literal
      */
-    @Deprecated("Literal is the Correct name by Brigadier", ReplaceWith("literal(name, setup)"))
+    @Deprecated("Literal is the Correct name by Brigadier (will removed soon)", ReplaceWith("literal(name, setup)"))
     fun command(name: String, setup: DSLCommandNode<T>.() -> Unit)
 
     /**
      * adds an argument node
      * @see RequiredArgumentBuilder
+     * @see ArgumentBuilder.then
      */
     fun <S> argument(name: String, type: ArgumentType<S>, setup: DSLCommandNode<T>.() -> Unit)
+
+    /**
+     * adds an Suggestion provider
+     * will run an each suggestion request
+     * @see SuggestionProvider
+     * @see RequiredArgumentBuilder.suggests
+     */
+    fun suggest(onSuggest: SuggestionsBuilder.() -> Unit)
 }
 
-class DSLCommandNodeImpl<T>(override val builder: ArgumentBuilder<T, *>, private val parent: CommandNode<T>) : DSLCommandNode<T> {
+private class DSLCommandNodeImpl<T>(override val builder: ArgumentBuilder<T, *>, private val parent: CommandNode<T>) :
+        DSLCommandNode<T> {
 
 
     val aliases = mutableSetOf<String>()
     var requires: Predicate<T> = Predicate { true }
     var executing: Command<T>? = null
     val childs = mutableSetOf<CommandEntry<T>>()
-    //TODO("Implement")
     private var suggestionProvider: SuggestionProvider<T>? = null
 
     override lateinit var node: CommandNode<T>
 
     override fun alias(alias: String) {
-        if (this.builder !is LiteralArgumentBuilder<T>) throw IllegalStateException("Only Literals Can have Aliases!")
+        if (this.builder !is LiteralArgumentBuilder<T>) throw IllegalStateException("Only literals can have aliases!")
         aliases.add(alias)
     }
 
@@ -98,6 +110,11 @@ class DSLCommandNodeImpl<T>(override val builder: ArgumentBuilder<T, *>, private
 
     override fun <S> argument(name: String, type: ArgumentType<S>, setup: DSLCommandNode<T>.() -> Unit) {
         childs.add(CommandEntry(RequiredArgumentBuilder.argument(name, type), setup))
+    }
+
+    override fun suggest(onSuggest: SuggestionsBuilder.() -> Unit) {
+        if (this.builder !is RequiredArgumentBuilder<T, *>) throw IllegalStateException("Only Arguments can have Custom Suggestions!")
+        suggestionProvider = DSLSuggestionProvider(onSuggest)
     }
 
     override fun command(name: String, setup: DSLCommandNode<T>.() -> Unit) = literal(name, setup)
@@ -131,8 +148,14 @@ class DSLCommandNodeImpl<T>(override val builder: ArgumentBuilder<T, *>, private
         }
     }
 
-
     class CommandEntry<T>(val argumentbuilder: ArgumentBuilder<T, *>, val setup: DSLCommandNode<T>.() -> Unit)
+}
+
+private class DSLSuggestionProvider<T>(val onSuggest: SuggestionsBuilder.() -> Unit) : SuggestionProvider<T> {
+    override fun getSuggestions(context: CommandContext<T>, builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
+        onSuggest.invoke(builder)
+        return builder.buildFuture()
+    }
 }
 
 /**
@@ -154,6 +177,11 @@ fun <T> CommandDispatcher<T>.literal(name: String, setup: DSLCommandNode<T>.() -
     return node.node
 }
 
+/**
+ * Like executes but always return 0!
+ * so the is no return need
+ * @see DSLCommandNode.executes
+ */
 fun <T> DSLCommandNode<T>.runs(executed: suspend T.(context: CommandContext<T>) -> Unit) {
     executes { executed.invoke(this, it);return@executes 0 }
 }
@@ -161,10 +189,12 @@ fun <T> DSLCommandNode<T>.runs(executed: suspend T.(context: CommandContext<T>) 
 fun <V : Any> CommandContext<*>.getArgument(name: String, clazz: KClass<V>): V = this.getArgument(name, clazz.java)
 inline fun <reified V : Any> CommandContext<*>.getArgument(name: String): V = this.getArgument(name, V::class)
 
+operator fun SuggestionsBuilder.plus(suggestion: String): SuggestionsBuilder = suggest(suggestion)
+operator fun SuggestionsBuilder.plus(suggestion: Int): SuggestionsBuilder = suggest(suggestion)
+
 val WordArgument = StringArgumentType.word()
 val StringArgument = StringArgumentType.string()
 val GreedyStringArgument = StringArgumentType.greedyString()
-
 val IntegerArgument = IntegerArgumentType.integer()
 val DoubleArgument = DoubleArgumentType.doubleArg()
 val LongArgument = LongArgumentType.longArg()
