@@ -58,12 +58,6 @@ interface DSLCommandNode<T> {
     fun literal(name: String, setup: DSLCommandNode<T>.() -> Unit)
 
     /**
-     * @see literal
-     */
-    @Deprecated("Literal is the Correct name by Brigadier (will removed soon)", ReplaceWith("literal(name, setup)"))
-    fun command(name: String, setup: DSLCommandNode<T>.() -> Unit)
-
-    /**
      * adds an argument node
      * @see RequiredArgumentBuilder
      * @see ArgumentBuilder.then
@@ -76,7 +70,7 @@ interface DSLCommandNode<T> {
      * @see SuggestionProvider
      * @see RequiredArgumentBuilder.suggests
      */
-    fun suggest(onSuggest: SuggestionsBuilder.() -> Unit)
+    fun suggest(onSuggest: SuggestionsBuilder.(context: CommandContext<T>) -> Unit)
 }
 
 private class DSLCommandNodeImpl<T>(override val builder: ArgumentBuilder<T, *>, private val parent: CommandNode<T>) :
@@ -112,12 +106,10 @@ private class DSLCommandNodeImpl<T>(override val builder: ArgumentBuilder<T, *>,
         childs.add(CommandEntry(RequiredArgumentBuilder.argument(name, type), setup))
     }
 
-    override fun suggest(onSuggest: SuggestionsBuilder.() -> Unit) {
+    override fun suggest(onSuggest: SuggestionsBuilder.(context: CommandContext<T>) -> Unit) {
         if (this.builder !is RequiredArgumentBuilder<T, *>) throw IllegalStateException("Only Arguments can have Custom Suggestions!")
         suggestionProvider = DSLSuggestionProvider(onSuggest)
     }
-
-    override fun command(name: String, setup: DSLCommandNode<T>.() -> Unit) = literal(name, setup)
 
     internal fun buildTree() {
         node = builder.also { build ->
@@ -151,9 +143,10 @@ private class DSLCommandNodeImpl<T>(override val builder: ArgumentBuilder<T, *>,
     class CommandEntry<T>(val argumentbuilder: ArgumentBuilder<T, *>, val setup: DSLCommandNode<T>.() -> Unit)
 }
 
-private class DSLSuggestionProvider<T>(val onSuggest: SuggestionsBuilder.() -> Unit) : SuggestionProvider<T> {
+private class DSLSuggestionProvider<T>(val onSuggest: SuggestionsBuilder.(context: CommandContext<T>) -> Unit) : SuggestionProvider<T> {
     override fun getSuggestions(context: CommandContext<T>, builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
-        onSuggest.invoke(builder)
+
+        onSuggest.invoke(builder, context)
         return builder.buildFuture()
     }
 }
@@ -184,6 +177,15 @@ fun <T> CommandDispatcher<T>.literal(name: String, setup: DSLCommandNode<T>.() -
  */
 fun <T> DSLCommandNode<T>.runs(executed: suspend T.(context: CommandContext<T>) -> Unit) {
     executes { executed.invoke(this, it);return@executes 0 }
+}
+
+/**
+ * Like executes but always return 0!
+ * so the is no return need
+ * @see DSLCommandNode.executes
+ */
+fun <T> DSLCommandNode<T>.executes(executed: suspend T.(context: CommandContext<T>) -> Unit) {
+    executes { executed(this, it);return@executes 0 }
 }
 
 fun <V : Any> CommandContext<*>.getArgument(name: String, clazz: KClass<V>): V = this.getArgument(name, clazz.java)
