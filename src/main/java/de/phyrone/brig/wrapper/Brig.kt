@@ -1,4 +1,7 @@
+@file:Suppress("unused")
+@file:SuppressWarnings("unused")
 package de.phyrone.brig.wrapper
+
 
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.CommandDispatcher
@@ -211,11 +214,11 @@ inline fun <reified V : Any> CommandContext<*>.getArgument(name: String): V = th
 operator fun SuggestionsBuilder.plus(suggestion: String): SuggestionsBuilder = suggest(suggestion)
 operator fun SuggestionsBuilder.plus(suggestion: Int): SuggestionsBuilder = suggest(suggestion)
 
-val WordArgument = StringArgumentType.word()
-val StringArgument = StringArgumentType.string()
-val GreedyStringArgument = StringArgumentType.greedyString()
-val IntegerArgument = IntegerArgumentType.integer()
-val DoubleArgument = DoubleArgumentType.doubleArg()
-val LongArgument = LongArgumentType.longArg()
-val FloatArgument = FloatArgumentType.floatArg()
-val BoolArgument = BoolArgumentType.bool()
+val WordArgument: StringArgumentType = StringArgumentType.word()
+val StringArgument: StringArgumentType = StringArgumentType.string()
+val GreedyStringArgument: StringArgumentType = StringArgumentType.greedyString()
+val IntegerArgument: IntegerArgumentType = IntegerArgumentType.integer()
+val DoubleArgument: DoubleArgumentType = DoubleArgumentType.doubleArg()
+val LongArgument: LongArgumentType = LongArgumentType.longArg()
+val FloatArgument: FloatArgumentType = FloatArgumentType.floatArg()
+val BoolArgument: BoolArgumentType = BoolArgumentType.bool()
