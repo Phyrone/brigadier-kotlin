@@ -11,7 +11,6 @@ import com.mojang.brigadier.suggestion.SuggestionProvider
 import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import com.mojang.brigadier.tree.CommandNode
-import kotlinx.coroutines.runBlocking
 import java.util.concurrent.CompletableFuture
 import java.util.function.Predicate
 import kotlin.reflect.KClass
@@ -23,6 +22,7 @@ interface DSLCommandNode<T> {
      * @throws UninitializedPropertyAccessException if you run before or at setup
      */
     val node: CommandNode<T>
+
     /**
      * just the brigadier builder
      */
@@ -49,7 +49,7 @@ interface DSLCommandNode<T> {
      * this will be executed if the currend command is called
      * @return the result as int
      */
-    fun executes(executed: suspend T.(context: CommandContext<T>) -> Int)
+    fun executes(executed: T.(context: CommandContext<T>) -> Int)
 
     /**
      * adds an Literal (non argument/subcommand) node
@@ -94,9 +94,10 @@ private class DSLCommandNodeImpl<T>(override val builder: ArgumentBuilder<T, *>,
         requires = Predicate(onCheck)
     }
 
-    override fun executes(executed: suspend T.(context: CommandContext<T>) -> Int) {
-        executing = Command { context -> runBlocking { executed.invoke(context.source, context) } }
+    override fun executes(executed: T.(context: CommandContext<T>) -> Int) {
+        executing = Command { context -> executed.invoke(context.source, context) }
     }
+
 
     override fun literal(name: String, setup: DSLCommandNode<T>.() -> Unit) {
         childs.add(CommandEntry(LiteralArgumentBuilder.literal(name), setup))
@@ -175,8 +176,11 @@ fun <T> CommandDispatcher<T>.literal(name: String, setup: DSLCommandNode<T>.() -
  * so the is no return need
  * @see DSLCommandNode.executes
  */
-fun <T> DSLCommandNode<T>.runs(executed: suspend T.(context: CommandContext<T>) -> Unit) {
-    executes { executed.invoke(this, it);return@executes 0 }
+fun <T> DSLCommandNode<T>.executesNoResult(executed: T.(context: CommandContext<T>) -> Unit) {
+    executes {
+        executed(this, it)
+        ;return@executes 0
+    }
 }
 
 /**
@@ -184,9 +188,22 @@ fun <T> DSLCommandNode<T>.runs(executed: suspend T.(context: CommandContext<T>) 
  * so the is no return need
  * @see DSLCommandNode.executes
  */
-fun <T> DSLCommandNode<T>.executes(executed: suspend T.(context: CommandContext<T>) -> Unit) {
-    executes { executed(this, it);return@executes 0 }
+fun <T> DSLCommandNode<T>.executes(executed: T.(context: CommandContext<T>) -> Unit) {
+    executes {
+        executed(this, it)
+        ;return@executes 0
+    }
 }
+
+/**
+ * Like executes but always return 0!
+ * so the is no return need
+ * @see DSLCommandNode.executes
+ */
+fun <T> DSLCommandNode<T>.runs(executed: T.(context: CommandContext<T>) -> Unit) {
+    executes { executed.invoke(this, it);return@executes 0 }
+}
+
 
 fun <V : Any> CommandContext<*>.getArgument(name: String, clazz: KClass<V>): V = this.getArgument(name, clazz.java)
 inline fun <reified V : Any> CommandContext<*>.getArgument(name: String): V = this.getArgument(name, V::class)
