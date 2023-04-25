@@ -9,7 +9,7 @@
     <version>1.4.0-SNAPSHOT</version>
 
     <properties>
-        <kotlin.version>1.8.20</kotlin.version>
+        <kotlin.version>1.8.21</kotlin.version>
     </properties>
     <distributionManagement>
         <snapshotRepository>
